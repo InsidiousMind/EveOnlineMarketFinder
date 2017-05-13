@@ -1,0 +1,7 @@
+[package]
+name = "EveOnlineMarketFinder"
+version = "0.1.0"
+authors = ["insi"]
+
+[dependencies]
+requests = "0.0.30"
