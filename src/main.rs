@@ -48,13 +48,18 @@ enum Hubs {
 */
 
 fn main() {
+    //set up the client for SSL connection
     let ssl = NativeTlsClient::new().unwrap();
     let connector = HttpsConnector::new(ssl);
     let client = Client::with_connector(connector);
+    // parse the CSV data
     let mut items = Items::new(String::from("./data/invTypes.csv"));
     items.parse_csv();
+    
+    //setup the vector which will hold all the market data
     let mut data = Vec::<MarketItems>::new();
-   
+
+    //iterate thorugh ID's and query it, store result in data vec
     for id in items.ids.iter() {
         data.push(MarketItems { type_id: id.typeID, history: serde_json::from_str(&request_data(&client, id.typeID)).unwrap()});
         println!("TypeID: {}", id.typeID);
@@ -62,13 +67,15 @@ fn main() {
 }
 
 fn request_data(client: &Client, typeid: i64) -> String {
-
+    
+    //the endpoint on ESI we will be querying
     let mut endpoint = Url::parse_with_params("https://esi.tech.ccp.is/latest/markets/10000002/history/?datasource=tranquility",
                                               &[("type_id", typeid.to_string())]).unwrap();
-
+    // send the GET request
     let mut res = client.get(endpoint).send().unwrap();
     assert_eq!(res.status, hyper::Ok, "[ERROR] The API Request Did Not Work {}", res.status);
-
+    
+    //convert result to String
     let mut body = String::new();
     res.read_to_string(&mut body).unwrap();
     body
