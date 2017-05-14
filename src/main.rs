@@ -18,6 +18,7 @@ use parse::Items;
 
 mod parse;
 
+#[derive(Debug)]
 struct MarketItems {
     type_id: i64,
     history: Vec<MarketItem>,
@@ -32,6 +33,7 @@ struct MarketItem {
     average: f64,
     lowest: f64,
 }
+
 /*
 enum Hubs {
     TheForge:   { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Jita", },
@@ -49,16 +51,17 @@ fn main() {
     let ssl = NativeTlsClient::new().unwrap();
     let connector = HttpsConnector::new(ssl);
     let client = Client::with_connector(connector);
-    let items = Items::new(String::from("./data/invTypes.csv")).parse_csv();
-    let data = Vec::<MarketItems>::new();
-    
-    items.ids.iter().map( |x| {
-        let temp = MarketItems { type_id: x.typeID, history: serde_json::from_str(&request_data(client, x.typeID)).unwrap()};
-        data.push(temp);
-    }).collect();
+    let mut items = Items::new(String::from("./data/invTypes.csv"));
+    items.parse_csv();
+    let mut data = Vec::<MarketItems>::new();
+   
+    for id in items.ids.iter() {
+        data.push(MarketItems { type_id: id.typeID, history: serde_json::from_str(&request_data(&client, id.typeID)).unwrap()});
+        println!("TypeID: {}", id.typeID);
+    }
 }
 
-fn request_data(client: Client, typeid: i64) -> String {
+fn request_data(client: &Client, typeid: i64) -> String {
 
     let mut endpoint = Url::parse_with_params("https://esi.tech.ccp.is/latest/markets/10000002/history/?datasource=tranquility",
                                               &[("type_id", typeid.to_string())]).unwrap();

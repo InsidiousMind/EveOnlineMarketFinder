@@ -2,28 +2,29 @@ use std::path::Path;
 use csv;
 use rustc_serialize;
 
+#[derive(Debug)]
 pub struct Items {
     pub ids: Vec<Item>,
     csv_path: String,
 }
 
 #[derive(RustcDecodable, Debug)]
-struct Item {
-    typeID: i64,
-    groupID: i64,
-    typeName: String,
-    description: Option<String>,
-    mass: f64,
-    volume: Option<i64>,
-    capacity: Option<i64>,
-    portionSize: Option<i64>,
-    raceID: Option<i64>,
-    basePrice: Option<i64>,
-    published: Option<i64>,
-    marketGroupID: Option<i64>,
-    iconID: Option<i64>,
-    soundID: Option<i64>,
-    graphicID: Option<i64>,
+pub struct Item {
+    pub typeID: i64,
+    pub groupID: i64,
+    pub typeName: String,
+    pub description: Option<String>,
+    pub mass: f64,
+    pub volume: Option<i64>,
+    pub capacity: Option<i64>,
+    pub portionSize: Option<i64>,
+    pub raceID: Option<i64>,
+    pub basePrice: Option<i64>,
+    pub published: Option<i64>,
+    pub marketGroupID: Option<i64>,
+    pub iconID: Option<i64>,
+    pub soundID: Option<i64>,
+    pub graphicID: Option<i64>,
 }
 
 impl Items {
