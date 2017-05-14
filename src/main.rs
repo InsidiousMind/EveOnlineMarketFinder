@@ -1,45 +1,38 @@
-#[macro_use] extern crate serde_derive;
-extern crate serde_xml_rs;
-
+#![feature(rustc_private)]
 extern crate hyper;
+extern crate hyper_native_tls;
+extern crate serde;
+extern crate serde_json;
+extern crate csv;
+extern crate rustc_serialize;
 
-use serde_xml_rs::deserialize;
-use hyper::Client;
-use hyper::Url;
+#[macro_use]
+extern crate serde_derive;
+
+use hyper::{ Client, Url} ;
+use hyper::net::HttpsConnector;
+use hyper_native_tls::NativeTlsClient;
 use std::io::Read;
 
-#[derive(Debug, Deserialize)]
-struct EvecApi {
-    version: String,
-    method: String,
-    marketstat: MarketStat,
+use parse::Items;
+
+mod parse;
+
+struct MarketItems {
+    type_id: i64,
+    history: Vec<MarketItem>,
 }
 
-#[derive(Debug, Deserialize)]
-struct MarketStat {
-    #[serde(rename="type")]
-    types: Vec<mType>,
+#[derive(Debug, Serialize, Deserialize)]
+struct MarketItem {
+    date: String,
+    order_count: i64,
+    volume: i64,
+    highest: f64,
+    average: f64,
+    lowest: f64,
 }
-
-#[derive(Debug, Deserialize)]
-struct mType {
-    id: i64,
-    buy: Data,
-    sell: Data,
-    all: Data,
-}
-
-#[derive(Debug, Deserialize)]
-struct Data {
-    volume: f64,
-    avg: f64,
-    max: f64,
-    min: f64,
-    stddev: f64,
-    median: f64,
-    percentile: f64,
-}
-
+/*
 enum Hubs {
     TheForge:   { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Jita", },
     Domain:     { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Amarr"},
@@ -50,36 +43,30 @@ enum Hubs {
     TashMurkon: { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Tash-Murkon Prime"},
     Khanid:     { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Agil"},
 }
+*/
 
 fn main() {
-    let url = "http://api.eve-central.com/api/marketstat?typeid=34&typeid=35&regionlimit=10000002";
-
-
+    let ssl = NativeTlsClient::new().unwrap();
+    let connector = HttpsConnector::new(ssl);
+    let client = Client::with_connector(connector);
+    let items = Items::new(String::from("./data/invTypes.csv")).parse_csv();
+    let data = Vec::<MarketItems>::new();
+    
+    items.ids.iter().map( |x| {
+        let temp = MarketItems { type_id: x.typeID, history: serde_json::from_str(&request_data(client, x.typeID)).unwrap()};
+        data.push(temp);
+    }).collect();
 }
 
-fn request_data(reg_id: i64, sys_id: i64, t_ids: Vec<i64>, ) {
-    let client = Client::new(); 
-    
-    let mut endpoint = Url::parse_with_params("http://api.eve-central.com/api/marketstat",
-                                              &[]
-                                              );
-    match endpoing {
-        Some() 
-    }
-    
+fn request_data(client: Client, typeid: i64) -> String {
 
-    let mut res = client.get(form_url(reg_id, sys_id, t_ids)).send().unwrap();
-    
-    assert_eq!(res.status, hyper::ok, "[ERROR] The API Request Did Not Work");
-    
+    let mut endpoint = Url::parse_with_params("https://esi.tech.ccp.is/latest/markets/10000002/history/?datasource=tranquility",
+                                              &[("type_id", typeid.to_string())]).unwrap();
+
+    let mut res = client.get(endpoint).send().unwrap();
+    assert_eq!(res.status, hyper::Ok, "[ERROR] The API Request Did Not Work {}", res.status);
+
     let mut body = String::new();
     res.read_to_string(&mut body).unwrap();
-    let eve_api: EvecApi = deserialize(body.as_bytes()).unwrap();
-
+    body
 }
-
-fn form_url(reg_id: i64, sys_id: i64, t_ids: Vec<i64>) -> String {
-    let base_url = "http://api.eve-central.com/api/marketstat?typeid=34&typeid=35&regionlimit=";
-}
-
-
