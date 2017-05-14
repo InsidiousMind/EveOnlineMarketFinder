@@ -1,15 +1,10 @@
-extern crate requests;
-use requests::ToJson;
+extern crate hyper;
+use hyper::Client;
 
 fn main() {
-    let response = requests::get("http://api.eve-central.com/api/marketstat?typeid=34&typeid=35&regionlimit=10000002").unwrap();
-    assert_eq!(response.url(), "http://api.eve-central.com/api/marketstat?typeid=34&typeid=35&regionlimit=10000002");
-    assert_eq!(response.reason(), "OK");
-    assert_eq!(response.status_code(), requests::StatusCode::Ok);
+    let url = "http://api.eve-central.com/api/marketstat?typeid=34&typeid=35&regionlimit=10000002";
+    let client = Client::new();
 
-    //let data = response.json().unwrap();
-    println!("response: {:?}", response);
-    //println!("data: {}", data);
-       
-
+    let res = client.get(url).send().unwrap();
+    assert_eq!(res.status, hyper::Ok);
 }

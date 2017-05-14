@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["insi"]
 
 [dependencies]
-requests = "0.0.30"
+hyper = "0.10.10"
