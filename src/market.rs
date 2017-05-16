@@ -1,5 +1,6 @@
-use ansi_term::Colour::{Red, Yellow, Blue, Purple};
+use ansi_term::Colour::{Red, Yellow, Blue};
 use hyper::{Client, Url};
+use hyper::client::Response;
 use hyper::net::HttpsConnector;
 use hyper_native_tls::NativeTlsClient;
 
@@ -10,7 +11,7 @@ use hyper;
 
 pub struct MarketItems {
     pub market_items: Vec<MarketItem>,
-    pub item_info: Option<ItemsWrapper>,
+    pub item_info: Option<Vec<ItemsWrapper>>,
     pub client: Client,
 }
 
@@ -32,23 +33,30 @@ pub struct ItemData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ItemsWrapper {
-    pub totalCount_str: String,
-    pub pageCount: i64,
+    #[serde(rename(deserialize="totalCount_str"))]
+    pub total_count_str: String,
+    #[serde(rename(deserialize="pageCount"))]
+    pub page_count: i64,
     pub items: Vec<Items>,
-    pub next: Next,
-    pub totalCount: i64,
-    pub pageCount_str: i64,
+    pub next: Option<Navigation>,
+    pub previous: Option<Navigation>,
+    #[serde(rename(deserialize="totalCount"))]
+    pub total_count: i64,
+    #[serde(rename(deserialize="pageCount_str"))]
+    pub page_count_str: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Next {
+pub struct Navigation {
     href: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Items {
-    marketGroup: MarketGroup,
-    itemType: Types,
+    #[serde(rename(deserialize="marketGroup"))]
+    market_group: MarketGroup,
+    #[serde(rename(deserialize="type"))]
+    item_type: Types,
     id: i64,
     id_str: String,
 }
@@ -97,7 +105,7 @@ impl MarketItems {
         let client = Client::with_connector(connector);
         MarketItems{
             market_items: Vec::new(),
-            item_info: None,
+            item_info: None, // Get rid of option, b/c vector always vec
             client: client,
         }
     }
@@ -114,19 +122,23 @@ impl MarketItems {
                 self.query_items();
                 if count == 5 { panic!("{} Could Not Succesfully Complete Item Query", Red.bold().paint("[ERROR]")); }
             },
+
             Some(ref mut types) => {
-                for item in types.items.iter() {
-                    self.market_items.push(
-                        MarketItem { 
-                            type_id: item.itemType.id, 
-                            history: serde_json::from_str(&Self::request_data(&self.client, item.itemType.id)).unwrap()
-                        });
-            
-                        println!("{} Info for Type: '{}' Downloaded ID: {}", 
-                                Blue.bold().paint("[Query] --"), 
-                                Yellow.paint(item.itemType.name.clone()), 
-                                item.itemType.id);
-                }
+                // TODO optimize this
+                for page in types.iter() {
+                    for item in page.items.iter() {
+                        self.market_items.push(
+                            MarketItem { 
+                                type_id: item.item_type.id, 
+                                history: serde_json::from_str(&Self::request_data(&self.client, item.item_type.id)).unwrap()
+                            });
+
+                            println!("{} Info for Type: '{}' Downloaded ID: {}", 
+                                    Blue.bold().paint("[Query] --"), 
+                                    Yellow.paint(item.item_type.name.clone()), 
+                                    item.item_type.id);
+                    }
+                } //inner
             },
         }
     }
@@ -156,18 +168,49 @@ impl MarketItems {
     fn get_items(&mut self) {
 
         println!("{}", Blue.bold().paint("Downloading Item Types..."));
-        
-        let endpoint = Url::parse("https://crest-tq.eveonline.com/market/types/").unwrap();
-        let mut res = self.client.get(endpoint).send().unwrap();
-
-        assert_eq!(res.status, hyper::Ok,
-                   "\n {} The API Request Did Not Work, status: {}",
-                   Red.bold().paint("[ERROR]"),
-                   res.status);
-    
         let mut body = String::new();
+        let mut res: Response;
+       
+        match self.item_info {
+            None => {
+                let endpoint = Url::parse("https://crest-tq.eveonline.com/market/types/").unwrap();
+                res = self.client.get(endpoint).send().unwrap();
+                assert_eq!(res.status, hyper::Ok,
+                           "\n {} The API Request Did Not Work, status: {}, for endpoint {}",
+                           Red.bold().paint("[ERROR]"),
+                           res.status,
+                           "https://crest-tq.eveonline.com/market/types/");
+            } 
+
+            Some(ref mut item_vec) => {
+                
+                let root_url: &str = &item_vec.get(item_vec.len()-1).unwrap().next.as_ref().unwrap().href;
+                let endpoint: Url = Url::parse(
+                    root_url)
+                    .unwrap();  
+                res = self.client.get(endpoint).send().unwrap();
+                assert_eq!(res.status, hyper::Ok,
+                           "\n {} The API Request Did Not Work, status: {} for endpoint {}",
+                           Red.bold().paint("[ERROR]"),
+                           res.status,
+                           "https://crest-tq.eveonline.com/market/types/?");//use of moved val
+            }
+        }
+
         res.read_to_string(&mut body).unwrap();
-        self.item_info = serde_json::from_str(&body).unwrap();
+
+        match self.item_info {
+            None => {
+                self.item_info = Some(Vec::new()); 
+                self.item_info.unwrap().push(serde_json::from_str(&body).unwrap());
+            },
+            Some(mut item_vec) => {
+                item_vec.as_mut().push(serde_json::from_str(&body).unwrap());  
+            }
+
+         
+        }
+        //self.item_info.as_mut().unwrap().push(serde_json::from_str(&body).unwrap());
     }
 }
 

@@ -1,4 +1,3 @@
-#![feature(rustc_private)]
 extern crate hyper;
 extern crate hyper_native_tls;
 extern crate serde;
@@ -10,10 +9,8 @@ extern crate ansi_term;
 #[macro_use]
 extern crate serde_derive;
 
-
 use market::MarketItems;
 
-mod parse;
 mod market;
 
 fn main() {
