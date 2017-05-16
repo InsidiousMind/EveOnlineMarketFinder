@@ -1,3 +1,4 @@
+#![feature(inclusive_range_syntax)]
 extern crate hyper;
 extern crate hyper_native_tls;
 extern crate serde;
