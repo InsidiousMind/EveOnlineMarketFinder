@@ -183,8 +183,9 @@ impl MarketItems {
             } 
 
             Some(ref mut item_vec) => {
-                
+                for x in item_vec.get(   
                 let root_url: &str = &item_vec.get(item_vec.len()-1).unwrap().next.as_ref().unwrap().href;
+                println!("{} Downloading Item Info from Page: {}", Blue.paint("[QUERY] --"), Yellow.bold().paint(root_url));
                 let endpoint: Url = Url::parse(
                     root_url)
                     .unwrap();  
@@ -202,10 +203,11 @@ impl MarketItems {
         match self.item_info {
             None => {
                 self.item_info = Some(Vec::new()); 
-                self.item_info.unwrap().push(serde_json::from_str(&body).unwrap());
+                self.item_info.as_mut().unwrap().push(serde_json::from_str(&body).unwrap());
             },
-            Some(mut item_vec) => {
-                item_vec.as_mut().push(serde_json::from_str(&body).unwrap());  
+            Some(ref mut item_vec) => {
+                let json = serde_json::from_str(&body).unwrap();
+                item_vec.push(json);  
             }
 
          
