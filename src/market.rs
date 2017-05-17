@@ -9,10 +9,11 @@ use std::io::Read;
 use serde_json;
 use hyper;
 
-pub struct MarketItems {
+pub struct Market {
     pub market_items: Vec<MarketItem>,
     pub item_info: Option<Vec<ItemsWrapper>>,
     pub client: Client,
+    pub station_id: String,
 }
 
 #[derive(Debug)]
@@ -82,31 +83,91 @@ pub struct Icon {
     href: Option<String>,
 }
 
-
-
-/*
-enum Hubs {
-    TheForge:   { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Jita", },
-    Domain:     { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Amarr"},
-    Heimatar:   { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Rens"},
-    SinqLaison: { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Dodixie"},
-    Metropolis: { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Hek"},
-    Essence:    { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Oursulaert"},
-    TashMurkon: { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Tash-Murkon Prime"},
-    Khanid:     { RegionLimit("regionlimit", i64), System("usesystem", i64), SystemName: "Agil"},
+#[derive(Copy, Clone)]
+pub enum Hubs {
+    Jita,
+    Amarr,
+    Dodixie,
+    Rens,
+    Hek,
 }
-*/
 
-impl MarketItems {
+impl Hubs {
 
-    pub fn new() -> Self {
+    // uppercase version of name for use in `match` statements
+    pub fn name_match(&self) -> String {
+        match *self {
+            Hubs::Jita    => "Jita".to_uppercase(),
+            Hubs::Amarr   => "Amarr".to_uppercase(),
+            Hubs::Dodixie => "Dodixie".to_uppercase(),
+            Hubs::Rens    => "Rens".to_uppercase(),
+            Hubs::Hek     => "Hek".to_uppercase(),
+        }
+    }
+
+    fn id(&self) -> i64 {
+        match *self {
+            Hubs::Jita    => 60003760,
+            Hubs::Amarr   => 60008494,
+            Hubs::Dodixie => 60011866,
+            Hubs::Rens    => 60004588,
+            Hubs::Hek     => 60005686,
+        }
+    }
+
+    fn id_str(&self) -> &'static str {
+        match *self {
+            Hubs::Jita    => "60003760",
+            Hubs::Amarr   => "60008494",
+            Hubs::Dodixie => "60011866",
+            Hubs::Rens    => "60004588",
+            Hubs::Hek     => "60005686",
+        }
+    }
+
+    fn name(&self) -> &str {
+        match *self {
+            Hubs::Jita    => "Jita",
+            Hubs::Amarr   => "Amarr",
+            Hubs::Dodixie => "Dodixie",
+            Hubs::Rens    => "Rens",
+            Hubs::Hek     => "Hek",
+        }
+    }
+}
+
+//static, pub, private
+impl Market {
+
+    pub fn new(station: &str) -> Option<Self> {
         let ssl = NativeTlsClient::new().unwrap();
         let connector = HttpsConnector::new(ssl);
         let client = Client::with_connector(connector);
-        MarketItems{
-            market_items: Vec::new(),
-            item_info: None, // Get rid of option, b/c vector always vec
-            client: client,
+       
+        match Self::parse_hubs(station) {
+            Some(x) => {
+                Some(Market {
+                    market_items: Vec::new(),
+                    item_info: None,
+                    client: client,
+                    station_id: x.to_owned(),
+                })
+            }
+            None => { 
+                println!("{} Please Enter The Station Name Correctly. Proceed with Default (Jita) Station? (Y/n)", Red.bold().paint("[ERROR]")); 
+                return None;
+            }
+        }
+    }
+
+    fn parse_hubs(station: &str) -> Option<&str> {
+        match String::from(station).to_uppercase().as_ref() {
+            station_id if station_id == Hubs::Jita.name_match()    => Some(Hubs::Jita.id_str().clone()),
+            station_id if station_id == Hubs::Amarr.name_match()   => Some(Hubs::Amarr.id_str().clone()),
+            station_id if station_id == Hubs::Dodixie.name_match() => Some(Hubs::Dodixie.id_str().clone()),
+            station_id if station_id == Hubs::Rens.name_match()    => Some(Hubs::Dodixie.id_str().clone()),
+            station_id if station_id == Hubs::Hek.name_match()     => Some(Hubs::Hek.id_str().clone()),
+            _ =>  None,
         }
     }
 
@@ -155,7 +216,7 @@ impl MarketItems {
         // send the GET request
         let mut res = client.get(endpoint.as_ref()).send().unwrap();
         assert_eq!(res.status, hyper::Ok, 
-                   "\n {} The API Request Did Not Work status: {} at endpoint: {}. Total Item Count: {}", 
+                   "\n {} The API Request Did Not Work status: {} at endpoint: {}. \n Total Item Count: {}", 
                    Red.bold().paint("[ERROR]"), 
                    Red.paint(res.status.to_string()),
                    Red.bold().paint(endpoint.as_ref().to_string()),
@@ -179,7 +240,7 @@ impl MarketItems {
                 let endpoint = Url::parse(root_url).unwrap();
                 res = Some(self.client.get(endpoint.as_ref()).send().unwrap());
                 assert_eq!(res.as_ref().unwrap().status, hyper::Ok,
-                           "\n {} The API Request Did Not Work, status: {}, for endpoint {}",
+                           "\n {} The API request didn't work, status: {}, for endpoint {}",
                            Red.bold().paint("[ERROR]"),
                            res.as_ref().unwrap().status,
                            &endpoint.to_string());
@@ -191,7 +252,7 @@ impl MarketItems {
 
                     res = Some(self.client.get(endpoint.as_ref()).send().unwrap());
                     assert_eq!(res.as_ref().unwrap().status, hyper::Ok,
-                               "\n {} The API Request Did Not Work, status: {} for endpoint {}",
+                               "\n {} The API request didn't work, status: {} for endpoint {}",
                                Red.bold().paint("[ERROR]"),
                                res.as_ref().unwrap().status,
                                &endpoint.to_string());
@@ -206,7 +267,6 @@ impl MarketItems {
                 self.item_info.as_mut().unwrap().push(serde_json::from_str(&body).unwrap());
                 self.get_items();
             },
-
             Some(ref mut item_vec) => {
                 let json = serde_json::from_str(&body).unwrap();
                 item_vec.push(json);  
@@ -214,7 +274,6 @@ impl MarketItems {
 
          
         }
-        //self.item_info.as_mut().unwrap().push(serde_json::from_str(&body).unwrap());
     }
 }
 
