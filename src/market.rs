@@ -18,7 +18,6 @@ pub struct Market {
 
 #[derive(Debug)]
 pub struct MarketItem {
-    pub type_id: i64,
     pub history: Vec<ItemData>,
 }
 
@@ -191,22 +190,20 @@ impl Market {
                 for page in types.iter() {
                     self.market_items.push(
                         MarketItem { 
-                            type_id: page.items.item_type.id, //Not Good, MarketItem was from old struct
-                            history: serde_json::from_str(&Self::request_data(page.items, self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
+                            history: serde_json::from_str(&Self::request_data(page.items.as_ref(), self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
                         });
-                        total_item_count += 1;
                 }
             },
         }
     }
 
 
-    fn request_data(items: Vec<Items>, station_id: &str, client: &Client, item_count: i64) -> String {
+    fn request_data(items: &Vec<Items>, station_id: &str, client: &Client, mut item_count: i64) -> String {
         
         //the endpoint on Fuzzwork we will be querying 
         let root_url = "https://market.fuzzwork.co.uk/aggregates/?region=".to_string() + station_id;
         let endpoint = Url::parse_with_params(&root_url,
-                                                  &[("type_id", Self::form_item_url(&items))]).unwrap();
+                                                  &[("type_id", Self::form_item_url(items, &mut item_count))]).unwrap();
         // send the GET request
         let mut res = client.get(endpoint.as_ref()).send().unwrap();
         assert_eq!(res.status, hyper::Ok, 
@@ -223,11 +220,13 @@ impl Market {
         body
     }
 
-    fn form_item_url(items: &Vec<Items>) -> String {
+    fn form_item_url(items: &Vec<Items>, item_count: &mut i64) -> String {
         let mut items_str = "".to_string();
         for item in items.iter() {
             //a trailing comma will not produce HTTP error
-            items_str += &(item.item_type.id_str + ",");
+            let temp = (&item.item_type.id_str).to_string() + ",";
+            items_str += &temp;
+            *item_count += 1;
         }
         return items_str;
     }
