@@ -171,48 +171,42 @@ impl Market {
         }
     }
 
-    pub fn query_items(&mut self) {
+    pub fn get_items(&mut self) {
         
         //iterate through ID's and query it, store result in data vec
         let mut count = 0; 
         match self.item_info {
             None => {
                 println!("{} Item Info Does Not Exist", Yellow.bold().paint("[WARNING]"));
-                self.get_items();
+                self.request_items();
                 count += 1;
-                self.query_items();
+                self.get_items();
                 if count == 5 { panic!("{} Could Not Succesfully Complete Item Query", Red.bold().paint("[ERROR]")); }
             },
 
             Some(ref mut types) => {
                 // TODO optimize this
                 let mut total_item_count = 0;
+                println!("{} Downloading information for all types", Blue.bold().paint("[Query] --"));
                 for page in types.iter() {
-                    for item in page.items.iter() {
-                        self.market_items.push(
-                            MarketItem { 
-                                type_id: item.item_type.id, 
-                                history: serde_json::from_str(&Self::request_data(&self.client, item.item_type.id, total_item_count)).unwrap()
-                            });
-
-                            println!("{} Info for Type: '{}' Downloaded ID: {}", 
-                                    Blue.bold().paint("[Query] --"), 
-                                    Yellow.paint(item.item_type.name.clone()), 
-                                    item.item_type.id);
-                            total_item_count += 1;
-                    }
-                } //inner
+                    self.market_items.push(
+                        MarketItem { 
+                            type_id: page.items.item_type.id, //Not Good, MarketItem was from old struct
+                            history: serde_json::from_str(&Self::request_data(page.items, self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
+                        });
+                        total_item_count += 1;
+                }
             },
         }
     }
 
 
-    fn request_data(client: &Client, typeid: i64, item_count: i64) -> String {
+    fn request_data(items: Vec<Items>, station_id: &str, client: &Client, item_count: i64) -> String {
         
-        let root_url = "https://esi.tech.ccp.is/latest/markets/10000002/history/?datasource=tranquility";
-        //the endpoint on ESI we will be querying
+        //the endpoint on Fuzzwork we will be querying 
+        let root_url = "https://market.fuzzwork.co.uk/aggregates/?region=".to_string() + station_id;
         let endpoint = Url::parse_with_params(&root_url,
-                                                  &[("type_id", typeid.to_string())]).unwrap();
+                                                  &[("type_id", Self::form_item_url(&items))]).unwrap();
         // send the GET request
         let mut res = client.get(endpoint.as_ref()).send().unwrap();
         assert_eq!(res.status, hyper::Ok, 
@@ -229,7 +223,16 @@ impl Market {
         body
     }
 
-    fn get_items(&mut self) {
+    fn form_item_url(items: &Vec<Items>) -> String {
+        let mut items_str = "".to_string();
+        for item in items.iter() {
+            //a trailing comma will not produce HTTP error
+            items_str += &(item.item_type.id_str + ",");
+        }
+        return items_str;
+    }
+
+    fn request_items(&mut self) {
 
         let mut body = String::new();
         let mut res: Option<Response> = None;
@@ -265,7 +268,7 @@ impl Market {
             None => {
                 self.item_info = Some(Vec::new()); 
                 self.item_info.as_mut().unwrap().push(serde_json::from_str(&body).unwrap());
-                self.get_items();
+                self.request_items();
             },
             Some(ref mut item_vec) => {
                 let json = serde_json::from_str(&body).unwrap();

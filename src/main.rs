@@ -19,7 +19,7 @@ mod market;
 
 fn main() {
     let mut market = Market::new("Jita").unwrap();
-    market.query_items();
+    market.get_items();
 
 }
 
