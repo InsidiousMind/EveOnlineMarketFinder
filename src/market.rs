@@ -11,16 +11,17 @@ use serde_json;
 use hyper;
 
 pub struct Market {
-    pub market_items: Vec<Aggregates>,
+    //pub market_items: Vec<Aggregates>,
+    pub market_items: HashMap<i64, MarketData>,
     pub item_info: Option<Vec<ItemsWrapper>>,
     pub client: Client,
     pub station_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/*#[derive(Debug, Serialize, Deserialize)]
 pub struct Aggregates {
     pub type_history: HashMap<i64, MarketData>,
-}
+}*/
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MarketData {
@@ -158,7 +159,7 @@ impl Market {
         match Self::parse_hubs(station) {
             Some(x) => {
                 Some(Market {
-                    market_items: Vec::new(),
+                    market_items: HashMap::new(),
                     item_info: None,
                     client: client,
                     station_id: x.to_owned(),
@@ -232,10 +233,17 @@ impl Market {
                 let total_item_count = 0;
                 println!("{} Downloading information for all types", Blue.bold().paint("[Query] --"));
                 for page in types.iter() {
-                    self.market_items.push(
+                    self.market_items.extend::<HashMap<i64, MarketData>>(
+                            serde_json::from_str(&Self::request_data(
+                                    page.items.as_ref(), 
+                                    self.station_id.as_ref(), 
+                                    &self.client, 
+                                    total_item_count).as_str()).unwrap()
+                        );
+                    /*self.market_items.push( //works with previous implementation
                         Aggregates { 
                             type_history: serde_json::from_str(&Self::request_data(page.items.as_ref(), self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
-                        });
+                        });*/
                 }
             },
         }
@@ -286,7 +294,6 @@ impl Market {
 
     fn find(&self) -> Vec<Items>{
         unimplemented!(); 
-    
     }
 }
 
