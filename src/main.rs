@@ -17,8 +17,6 @@ mod market;
 fn main() {
     let mut market = Market::new("Jita").unwrap();
     market.get_items();
-
-//    println!("Types! {:?}", market.market_items.get(0).unwrap().type_history.get(&2817));
-
+    println!("Types!? {:?}", market.market_items.get(&2817));
 }
 

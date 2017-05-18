@@ -11,17 +11,11 @@ use serde_json;
 use hyper;
 
 pub struct Market {
-    //pub market_items: Vec<Aggregates>,
     pub market_items: HashMap<i64, MarketData>,
     pub item_info: Option<Vec<ItemsWrapper>>,
     pub client: Client,
     pub station_id: String,
 }
-
-/*#[derive(Debug, Serialize, Deserialize)]
-pub struct Aggregates {
-    pub type_history: HashMap<i64, MarketData>,
-}*/
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MarketData {
@@ -239,11 +233,7 @@ impl Market {
                                     self.station_id.as_ref(), 
                                     &self.client, 
                                     total_item_count).as_str()).unwrap()
-                        );
-                    /*self.market_items.push( //works with previous implementation
-                        Aggregates { 
-                            type_history: serde_json::from_str(&Self::request_data(page.items.as_ref(), self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
-                        });*/
+                    );
                 }
             },
         }
