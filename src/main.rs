@@ -11,15 +11,14 @@ extern crate ansi_term;
 extern crate serde_derive;
 
 use market::Market;
-use market::Hubs;
-
-use std::io::{self, Write};
 
 mod market;
 
 fn main() {
     let mut market = Market::new("Jita").unwrap();
     market.get_items();
+
+//    println!("Types! {:?}", market.market_items.get(0).unwrap().type_history.get(&2817));
 
 }
 

@@ -5,30 +5,42 @@ use hyper::net::HttpsConnector;
 use hyper_native_tls::NativeTlsClient;
 
 use std::io::Read;
+use std::collections::HashMap;
 
 use serde_json;
 use hyper;
 
 pub struct Market {
-    pub market_items: Vec<MarketItem>,
+    pub market_items: Vec<Aggregates>,
     pub item_info: Option<Vec<ItemsWrapper>>,
     pub client: Client,
     pub station_id: String,
 }
 
-#[derive(Debug)]
-pub struct MarketItem {
-    pub history: Vec<ItemData>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Aggregates {
+    pub type_history: HashMap<i64, MarketData>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ItemData {
-    pub date: String,
-    pub order_count: i64,
-    pub volume: i64,
-    pub highest: f64,
-    pub average: f64,
-    pub lowest: f64,
+pub struct MarketData {
+    pub buy: Data,
+    pub sell: Data,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Data {
+    #[serde(rename(deserialize="weightedAverage"))]
+    weighted_average: Option<String>,
+    max: Option<String>,
+    min: Option<String>,
+    #[serde(rename(deserialize="stddev"))]
+    std_dev: Option<String>,
+    median: Option<String>,
+    volume: Option<String>,
+    #[serde(rename(deserialize="orderCount"))]
+    order_count: Option<String>,
+    percentile: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -94,7 +106,7 @@ pub enum Hubs {
 impl Hubs {
 
     // uppercase version of name for use in `match` statements
-    pub fn name_match(&self) -> String {
+    fn name_match(&self) -> String {
         match *self {
             Hubs::Jita    => "Jita".to_uppercase(),
             Hubs::Amarr   => "Amarr".to_uppercase(),
@@ -170,40 +182,12 @@ impl Market {
         }
     }
 
-    pub fn get_items(&mut self) {
-        
-        //iterate through ID's and query it, store result in data vec
-        let mut count = 0; 
-        match self.item_info {
-            None => {
-                println!("{} Item Info Does Not Exist", Yellow.bold().paint("[WARNING]"));
-                self.request_items();
-                count += 1;
-                self.get_items();
-                if count == 5 { panic!("{} Could Not Succesfully Complete Item Query", Red.bold().paint("[ERROR]")); }
-            },
-
-            Some(ref mut types) => {
-                // TODO optimize this
-                let mut total_item_count = 0;
-                println!("{} Downloading information for all types", Blue.bold().paint("[Query] --"));
-                for page in types.iter() {
-                    self.market_items.push(
-                        MarketItem { 
-                            history: serde_json::from_str(&Self::request_data(page.items.as_ref(), self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
-                        });
-                }
-            },
-        }
-    }
-
-
     fn request_data(items: &Vec<Items>, station_id: &str, client: &Client, mut item_count: i64) -> String {
         
         //the endpoint on Fuzzwork we will be querying 
         let root_url = "https://market.fuzzwork.co.uk/aggregates/?region=".to_string() + station_id;
-        let endpoint = Url::parse_with_params(&root_url,
-                                                  &[("type_id", Self::form_item_url(items, &mut item_count))]).unwrap();
+        let endpoint = Url::parse_with_params(&root_url, &[("types", Self::form_item_url(items, &mut item_count))]).unwrap();
+        
         // send the GET request
         let mut res = client.get(endpoint.as_ref()).send().unwrap();
         assert_eq!(res.status, hyper::Ok, 
@@ -219,7 +203,7 @@ impl Market {
         res.read_to_string(&mut body).unwrap();
         body
     }
-
+    
     fn form_item_url(items: &Vec<Items>, item_count: &mut i64) -> String {
         let mut items_str = "".to_string();
         for item in items.iter() {
@@ -230,15 +214,40 @@ impl Market {
         }
         return items_str;
     }
+    
+    pub fn get_items(&mut self) {
+        
+        //iterate through ID's and query it, store result in data vec
+        let mut count = 0; 
+        match self.item_info {
+            None => {
+                println!("{} Item Info Does Not Exist", Yellow.bold().paint("[WARNING]"));
+                self.request_items();
+                count += 1;
+                self.get_items();
+                if count == 5 { panic!("{} Could Not Succesfully Complete Item Query", Red.bold().paint("[ERROR]")); }
+            },
+            Some(ref mut types) => {
+                // TODO optimize this
+                let total_item_count = 0;
+                println!("{} Downloading information for all types", Blue.bold().paint("[Query] --"));
+                for page in types.iter() {
+                    self.market_items.push(
+                        Aggregates { 
+                            type_history: serde_json::from_str(&Self::request_data(page.items.as_ref(), self.station_id.as_ref(), &self.client, total_item_count).as_str()).unwrap()
+                        });
+                }
+            },
+        }
+    }
 
     fn request_items(&mut self) {
-
         let mut body = String::new();
         let mut res: Option<Response> = None;
         let root_url: &str = "https://crest-tq.eveonline.com/market/types/";
         match self.item_info {
             None => {
-                println!("{}", Blue.bold().paint("Downloading Item Types From First Page..."));
+                println!("{}", Blue.bold().paint("Downloading item types (this may take a few seconds...)"));
                 let endpoint = Url::parse(root_url).unwrap();
                 res = Some(self.client.get(endpoint.as_ref()).send().unwrap());
                 assert_eq!(res.as_ref().unwrap().status, hyper::Ok,
@@ -261,7 +270,6 @@ impl Market {
                 }
             }
         }
-
         res.unwrap().read_to_string(&mut body).unwrap();
         match self.item_info {
             None => {
@@ -273,9 +281,12 @@ impl Market {
                 let json = serde_json::from_str(&body).unwrap();
                 item_vec.push(json);  
             }
-
-         
         }
+    }
+
+    fn find(&self) -> Vec<Items>{
+        unimplemented!(); 
+    
     }
 }
 
