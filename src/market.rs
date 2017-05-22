@@ -10,33 +10,22 @@ use std::collections::HashMap;
 use serde_json;
 use hyper;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Market {
+    #[serde(serialize_with = "ordered_map")]
     pub market_items: HashMap<i64, MarketData>,
+    //One vec. Stores "pages" of item wrappers.
+    //would eventually want to merge this together to just be
+    //one ItemWrapper struct, with all items in "items" merged
     pub item_info: Option<Vec<ItemsWrapper>>,
     pub client: Client,
     pub station_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MarketData {
-    pub buy: Data,
-    pub sell: Data,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Data {
-    #[serde(rename(deserialize="weightedAverage"))]
-    weighted_average: Option<String>,
-    max: Option<String>,
-    min: Option<String>,
-    #[serde(rename(deserialize="stddev"))]
-    std_dev: Option<String>,
-    median: Option<String>,
-    volume: Option<String>,
-    #[serde(rename(deserialize="orderCount"))]
-    order_count: Option<String>,
-    percentile: Option<String>,
-}
+// TODO: Make sure I got the structs right. Especially with regards to 
+// ItemsWrapper -> Items -> Types. It doesn't feel right
+//  "Types" should be a vector of different Types + there ID. as the ID
+//  in Items should be the market group? not sure.
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ItemsWrapper {
@@ -44,7 +33,11 @@ pub struct ItemsWrapper {
     pub total_count_str: String,
     #[serde(rename(deserialize="pageCount"))]
     pub page_count: i64,
-    pub items: Vec<Items>,
+
+    // want this to eventually be something in "Market" instead of 
+    // part of de-serialized data
+    pub items: Vec<Items>, 
+
     pub next: Option<Navigation>,
     pub previous: Option<Navigation>,
     #[serde(rename(deserialize="totalCount"))]
@@ -61,10 +54,10 @@ pub struct Navigation {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Items {
     #[serde(rename(deserialize="marketGroup"))]
-    market_group: MarketGroup,
+    market_group: MarketGroup, //this is the general market group
     #[serde(rename(deserialize="type"))]
     item_type: Types,
-    id: i64,
+    id: i64, //this is the ID of the type
     id_str: String,
 }
 
@@ -87,6 +80,29 @@ pub struct Types {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Icon {
     href: Option<String>,
+}
+
+//per-item market data for each
+//type
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MarketData {
+    pub buy: Data,
+    pub sell: Data,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Data {
+    #[serde(rename(deserialize="weightedAverage"))]
+    weighted_average: Option<String>,
+    max: Option<String>,
+    min: Option<String>,
+    #[serde(rename(deserialize="stddev"))]
+    std_dev: Option<String>,
+    median: Option<String>,
+    volume: Option<String>,
+    #[serde(rename(deserialize="orderCount"))]
+    order_count: Option<String>,
+    percentile: Option<String>,
 }
 
 #[derive(Copy, Clone)]
@@ -241,7 +257,7 @@ impl Market {
 
     fn request_items(&mut self) {
         let mut body = String::new();
-        let mut res: Option<Response> = None;
+        let mut res: Option<Response> = None; //make Res a Vec to store all the responses for the `Some(x)`
         let root_url: &str = "https://crest-tq.eveonline.com/market/types/";
         match self.item_info {
             None => {
