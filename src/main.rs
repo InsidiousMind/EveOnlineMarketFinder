@@ -4,7 +4,6 @@ extern crate hyper_native_tls;
 extern crate serde;
 extern crate serde_json;
 extern crate csv;
-extern crate rustc_serialize;
 extern crate ansi_term;
 
 #[macro_use]
